@@ -1,19 +1,40 @@
 workflows:
   ios-hello-world:
-    name: HelloWorld iOS
-    max_build_duration: 120
+    name: HelloWorld iOS - unsigned for local signing
+    max_build_duration: 30
     instance_type: mac_mini_m2
     environment:
       xcode: latest
       vars:
         XCODE_PROJECT: HelloWorld.xcodeproj
-        XCODE_SCHEME: HelloWorld
+        XCODE_TARGET: HelloWorld
     scripts:
-      - name: Build iOS archive and IPA
+      - name: Build unsigned iPhone app
         script: |
-          xcode-project build-ipa \
-            --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME"
+          set -euo pipefail
+          mkdir -p build/logs
+          xcodebuild build \
+            -project "$XCODE_PROJECT" \
+            -target "$XCODE_TARGET" \
+            -configuration Release \
+            -sdk iphoneos \
+            -arch arm64 \
+            CONFIGURATION_BUILD_DIR="$PWD/build/device" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            2>&1 | tee build/logs/xcodebuild.log
+      - name: Package IPA for local Apple ID signing
+        script: |
+          set -euo pipefail
+          test -f build/device/HelloWorld.app/Info.plist
+          test -f build/device/HelloWorld.app/HelloWorld
+          mkdir -p build/ios/ipa
+          PACKAGE_DIR="$(mktemp -d)"
+          mkdir -p "$PACKAGE_DIR/Payload"
+          ditto build/device/HelloWorld.app "$PACKAGE_DIR/Payload/HelloWorld.app"
+          ditto -c -k --keepParent "$PACKAGE_DIR/Payload" "$PWD/build/ios/ipa/HelloWorld-unsigned.ipa"
+          unzip -l build/ios/ipa/HelloWorld-unsigned.ipa
     artifacts:
       - build/ios/ipa/*.ipa
-      - /tmp/xcodebuild_logs/*.log
+      - build/logs/*.log

@@ -1,0 +1,8 @@
+build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+.DS_Store
+.gh-config/
+*.p12
+*.mobileprovision
